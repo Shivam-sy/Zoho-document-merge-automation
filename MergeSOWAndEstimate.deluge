@@ -1,0 +1,84 @@
+void automation.MergeSOWAndEstimate(Int dealId)
+{
+info "Deal ID";
+info dealId;
+dealInfo = zoho.crm.getRecordById("Deals",dealId);
+info "Deal Info";
+info dealInfo;
+attachmentResponse = zoho.crm.getRelatedRecords("Attachments","Deals",dealId);
+info "Attachments";
+info attachmentResponse;
+sowFile = null;
+if(attachmentResponse.size() > 0)
+{
+	firstAttachment = attachmentResponse.get(0);
+	info "Selected Attachment";
+	info firstAttachment;
+	attachmentId = firstAttachment.get("id");
+	sowFile = invokeurl
+	[
+		url :"https://www.zohoapis.in/crm/v2/Deals/" + dealId + "/Attachments/" + attachmentId
+		type :GET
+		connection:"zohocrm"
+	];
+	info "Downloaded SOW";
+	info sowFile;
+}
+if(sowFile != null)
+{
+	estimateNumber = dealInfo.get("Estimate_Number");
+	info "Estimate Number";
+	info estimateNumber;
+	booksResponse = invokeurl
+	[
+		url :"https://www.zohoapis.in/books/v3/estimates?organization_id=60074306642"
+		type :GET
+		connection:"zohobooks"
+	];
+	estimateId = "";
+	for each  estimate in booksResponse.get("estimates")
+	{
+		if(estimate.get("estimate_number") == estimateNumber)
+		{
+			estimateId = estimate.get("estimate_id");
+			break;
+		}
+	}
+	info "Estimate ID";
+	info estimateId;
+	estimateFile = invokeurl
+	[
+		url :"https://www.zohoapis.in/books/v3/estimates/" + estimateId + "?organization_id=60074306642&accept=pdf"
+		type :GET
+		connection:"zohobooks"
+	];
+	info "Estimate PDF";
+	info estimateFile;
+	output_settings = Map();
+	output_settings.put("name","Merged_SOW_Estimate.pdf");
+	paramList = List();
+	paramList.add({"paramName":"files","content":sowFile});
+	paramList.add({"paramName":"files","content":estimateFile});
+	paramList.add({"paramName":"output_settings","content":output_settings.toString(),"Content-Type":"application/json","stringPart":"true"});
+	writerResponse = invokeurl
+	[
+		url :"https://www.zohoapis.in/writer/api/v1/documents/pdf/combine"
+		type :POST
+		files:paramList
+		connection:"writer_connection_v2"
+	];
+	info "Writer Response";
+	info writerResponse;
+	if(writerResponse.containsKey("status_check_url"))
+	{
+		statusUrl = writerResponse.get("status_check_url");
+		info "Status URL";
+		info statusUrl;
+		updateMap = Map();
+		updateMap.put("Status_Check_URL",statusUrl);
+		updateResp = zoho.crm.updateRecord("Deals",dealId,updateMap);
+		info "Status URL Saved";
+		info updateResp;
+	}
+}
+}
