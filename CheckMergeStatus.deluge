@@ -1,0 +1,40 @@
+void automation.CheckMergeStatus(Int dealId)
+{
+dealInfo = zoho.crm.getRecordById("Deals",dealId);
+statusUrl = dealInfo.get("Status_Check_URL");
+info "Status URL";
+info statusUrl;
+statusResponse = invokeurl
+[
+	url :statusUrl
+	type :GET
+	connection:"writer_connection_v2"
+];
+info "Status Response";
+info statusResponse;
+if(statusResponse.get("status") == "completed")
+{
+	downloadLink = statusResponse.get("download_link");
+	info "Download Link";
+	info downloadLink;
+	mergedPdf = invokeurl
+	[
+		url :downloadLink
+		type :GET
+		connection:"writer_connection_v2"
+	];
+	info "Merged PDF";
+	info mergedPdf;
+	fileParam = List();
+	fileParam.add({"paramName":"file","content":mergedPdf});
+	uploadResponse = invokeurl
+	[
+		url :"https://www.zohoapis.in/crm/v2/Deals/" + dealId + "/Attachments"
+		type :POST
+		files:fileParam
+		connection:"zohocrm"
+	];
+	info "Upload Response";
+	info uploadResponse;
+}
+}
